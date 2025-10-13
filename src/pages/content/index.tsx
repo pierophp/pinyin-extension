@@ -234,9 +234,11 @@ async function fetchDictionaryData(
  */
 function createDictionaryPopup(data: DictionaryData, clickEvent: MouseEvent) {
   console.log("[Pinzi] createDictionaryPopup called with data:", data);
-  
+
   // Remove existing popup if any
-  const existingDialog = document.getElementById("pinzi-dictionary-dialog") as HTMLDialogElement;
+  const existingDialog = document.getElementById(
+    "pinzi-dictionary-dialog"
+  ) as HTMLDialogElement;
   if (existingDialog) {
     console.log("[Pinzi] Removing existing dialog");
     existingDialog.close();
@@ -423,21 +425,21 @@ function createDictionaryPopup(data: DictionaryData, clickEvent: MouseEvent) {
             }
           </div>
         `
-           )
-           .join('<div class="pinzi-meaning-divider"></div>')}
+          )
+          .join('<div class="pinzi-meaning-divider"></div>')}
       </div>
     </div>
   `;
 
   dialog.innerHTML = content;
   console.log("[Pinzi] Dialog HTML content set");
-  
+
   document.body.appendChild(dialog);
   console.log("[Pinzi] Dialog added to document.body");
 
   // Add event listeners for closing
   const closeBtn = document.getElementById("pinzi-popup-close");
-  
+
   console.log("[Pinzi] Close button found:", !!closeBtn);
 
   const closeDialog = () => {
@@ -556,7 +558,7 @@ function addRbClickListeners(rootElement: Document | Element = document) {
         `;
         document.body.appendChild(errorDialog);
         errorDialog.showModal();
-        
+
         const errorCloseBtn = document.getElementById("error-close-btn");
         errorCloseBtn?.addEventListener("click", () => {
           errorDialog.close();
