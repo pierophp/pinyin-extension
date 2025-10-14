@@ -1,51 +1,11 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
 import { DictionaryDialog } from "./DictionaryDialog";
+import { getToken } from "./helpers/getToken";
+import styleText from "./style.css?inline";
 
 // List of Chinese words that should have their pinyin (ruby text) removed
-const WORDS_TO_HIDE_PINYIN: string[] = [
-  "上帝",
-  "最初",
-  // Add more words here as needed
-];
-
-// Type definitions for dictionary data
-interface DictionaryWord {
-  simplified: string;
-  traditional: string;
-  pinyin: string;
-  frequency: string;
-  usage?: string;
-}
-
-interface Example {
-  simplified: string;
-  traditional: string;
-  pinyin: string;
-  translation: string;
-}
-
-interface Meaning {
-  class: string;
-  definition: string;
-  pronunciation: string;
-  usage?: string;
-  frequency: string;
-  examples?: Example[];
-  synonyms?: DictionaryWord[];
-  antonyms?: DictionaryWord[];
-  classifiers?: DictionaryWord[];
-  common_expressions?: Example[];
-  notes?: string;
-}
-
-interface DictionaryData {
-  simplified: string;
-  traditional: string;
-  meanings: Meaning[];
-  executionTime?: number;
-}
+let WORDS_TO_HIDE_PINYIN: string[] = [];
 
 /**
  * Remove pinyin (rt element) from ruby elements where rb matches the word list
@@ -73,8 +33,6 @@ function removePinyinForSpecificWords(
   });
 }
 
-let token: string | null = null;
-
 /**
  * Fetch dictionary data for a Chinese word
  */
@@ -83,26 +41,6 @@ async function fetchDictionaryData(
 ): Promise<DictionaryData | null> {
   console.log(`[Pinzi] fetchDictionaryData called for word: "${word}"`);
   try {
-    if (!token) {
-      console.log("[Pinzi] Requesting token from background script...");
-      // Get token from background script (content scripts can't access chrome.cookies)
-      const tokenResponse = await chrome.runtime.sendMessage({
-        action: "getCookie",
-      });
-      console.log("[Pinzi] Token response:", tokenResponse);
-
-      if (!tokenResponse.success || !tokenResponse.token) {
-        console.error(
-          "[Pinzi] Failed to get token. Please log in to editor.pinzi.org"
-        );
-        throw new Error(
-          "Authentication required. Please log in to editor.pinzi.org"
-        );
-      }
-
-      token = tokenResponse.token;
-    }
-
     // Use Pinzi API
     const API_ENDPOINT = "https://api.pinzi.org/ai/meaning";
     console.log(`[Pinzi] Calling API: ${API_ENDPOINT}?word=${word}`);
@@ -113,7 +51,7 @@ async function fetchDictionaryData(
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${await getToken()}`,
         },
       }
     );
@@ -135,12 +73,38 @@ async function fetchDictionaryData(
   }
 }
 
+async function fetchMyCjk(): Promise<void | null> {
+  try {
+    // Use Pinzi API
+    const API_ENDPOINT = "https://api.pinzi.org/my-cjk";
+
+    const response = await fetch(API_ENDPOINT, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${await getToken()}`,
+      },
+    });
+
+    console.log(`[Pinzi] API response status: ${response.status}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      return (WORDS_TO_HIDE_PINYIN = data.ideograms);
+    }
+  } catch (error) {
+    console.error("[Pinzi] Error fetching dictionary data:", error);
+    return null;
+  }
+}
+
 // Global reference to the dialog container and root
 let dialogContainer: HTMLDivElement | null = null;
+let shadowRoot: ShadowRoot | null = null;
 let dialogRoot: ReturnType<typeof createRoot> | null = null;
 
 /**
- * Create and show dictionary popup using React
+ * Create and show dictionary popup using React with Shadow DOM
  */
 function createDictionaryPopup(
   data: DictionaryData | null,
@@ -153,12 +117,28 @@ function createDictionaryPopup(
     error,
   });
 
-  // Create container if it doesn't exist
+  // Create container with Shadow DOM if it doesn't exist
   if (!dialogContainer) {
+    // Create host element
     dialogContainer = document.createElement("div");
     dialogContainer.id = "pinzi-dictionary-root";
     document.body.appendChild(dialogContainer);
-    dialogRoot = createRoot(dialogContainer);
+
+    // Attach shadow DOM
+    shadowRoot = dialogContainer.attachShadow({ mode: "open" });
+
+    // Inject styles into shadow DOM
+    const styleElement = document.createElement("style");
+    styleElement.textContent = styleText;
+    shadowRoot.appendChild(styleElement);
+
+    // Create a container inside shadow DOM for React
+    const shadowContainer = document.createElement("div");
+    shadowContainer.id = "shadow-container";
+    shadowRoot.appendChild(shadowContainer);
+
+    // Create React root in shadow DOM
+    dialogRoot = createRoot(shadowContainer);
   }
 
   const handleClose = () => {
@@ -167,6 +147,7 @@ function createDictionaryPopup(
       dialogRoot.unmount();
       dialogContainer.remove();
       dialogContainer = null;
+      shadowRoot = null;
       dialogRoot = null;
     }
   };
@@ -202,14 +183,14 @@ function addRbClickListeners(rootElement: Document | Element = document) {
     rb.setAttribute("data-pinzi-listener", "true");
     rb.classList.add("pinzi-clickable");
 
-    console.log(
-      `[Pinzi] Added listener to rb element ${index}: "${rb.textContent}"`
-    );
+    // console.log(
+    //   `[Pinzi] Added listener to rb element ${index}: "${rb.textContent}"`
+    // );
 
     rb.addEventListener("click", async (event) => {
       console.log("[Pinzi] Click event fired on rb element!");
-      event.preventDefault();
-      event.stopPropagation();
+      // event.preventDefault();
+      // event.stopPropagation();
 
       const word = rb.textContent?.trim() || "";
       console.log(`[Pinzi] Clicked word: "${word}"`);
@@ -246,17 +227,15 @@ function addRbClickListeners(rootElement: Document | Element = document) {
 /**
  * Initialize the extension
  */
-function init() {
-  console.log("=== [Pinzi] Pinyin Extension: Content script loaded ===");
-  console.log("[Pinzi] Document ready state:", document.readyState);
-  console.log("[Pinzi] Body element exists:", !!document.body);
-
+async function init() {
   // Process existing ruby elements
-  console.log("[Pinzi] Processing existing ruby elements...");
-  removePinyinForSpecificWords();
 
   console.log("[Pinzi] Adding click listeners to rb elements...");
   addRbClickListeners();
+
+  await fetchMyCjk();
+  console.log("[Pinzi] Processing existing ruby elements...");
+  removePinyinForSpecificWords();
 
   // Set up MutationObserver to handle dynamically added content
   const observer = new MutationObserver((mutations) => {
@@ -285,10 +264,6 @@ function init() {
     childList: true,
     subtree: true,
   });
-
-  console.log(
-    `Pinyin Extension: Monitoring for ${WORDS_TO_HIDE_PINYIN.length} words`
-  );
 }
 
 // Run when DOM is ready
