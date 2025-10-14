@@ -1,4 +1,7 @@
+import React from "react";
+import { createRoot } from "react-dom/client";
 import "./style.css";
+import { DictionaryDialog } from "./DictionaryDialog";
 
 // List of Chinese words that should have their pinyin (ruby text) removed
 const WORDS_TO_HIDE_PINYIN: string[] = [
@@ -61,14 +64,16 @@ function removePinyinForSpecificWords(
     // Check if the text content matches any word in our list
     const rbText = rbElement.textContent?.trim() || "";
     if (WORDS_TO_HIDE_PINYIN.includes(rbText)) {
-      // Find all rt (ruby text) elements and clear their content
+      // Find all rt (ruby text) elements and hide them with Tailwind CSS
       const rtElements = ruby.querySelectorAll("rt");
       rtElements.forEach((rt) => {
-        rt.textContent = "";
+        rt.classList.add("!hidden");
       });
     }
   });
 }
+
+let token: string | null = null;
 
 /**
  * Fetch dictionary data for a Chinese word
@@ -78,395 +83,103 @@ async function fetchDictionaryData(
 ): Promise<DictionaryData | null> {
   console.log(`[Pinzi] fetchDictionaryData called for word: "${word}"`);
   try {
-    // Mock data for testing - replace with actual API call when ready
-    // const API_ENDPOINT = "YOUR_API_ENDPOINT_HERE";
-    // const response = await fetch(
-    //   `${API_ENDPOINT}?word=${encodeURIComponent(word)}`
-    // );
-    // if (!response.ok) {
-    //   throw new Error(`HTTP error! status: ${response.status}`);
-    // }
-    // const data: DictionaryData = await response.json();
-    // return data;
+    if (!token) {
+      console.log("[Pinzi] Requesting token from background script...");
+      // Get token from background script (content scripts can't access chrome.cookies)
+      const tokenResponse = await chrome.runtime.sendMessage({
+        action: "getCookie",
+      });
+      console.log("[Pinzi] Token response:", tokenResponse);
 
-    // Simulate API delay
-    console.log("[Pinzi] Simulating API delay (500ms)...");
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!tokenResponse.success || !tokenResponse.token) {
+        console.error(
+          "[Pinzi] Failed to get token. Please log in to editor.pinzi.org"
+        );
+        throw new Error(
+          "Authentication required. Please log in to editor.pinzi.org"
+        );
+      }
 
-    // Mock data
-    const mockData: DictionaryData = {
-      meanings: [
-        {
-          class: "verbo",
-          usage:
-            "Usado para expressar um desejo ou uma expectativa sobre algo. Geralmente é seguido por uma oração que descreve o que se espera. Pode ser usado com '能' (néng) para suavizar o desejo, tornando-o mais uma esperança do que uma exigência.",
-          antonyms: [
-            {
-              usage:
-                "Significa 'ficar desapontado', 'perder a esperança'. É o oposto direto de ter uma esperança, descrevendo o sentimento após um resultado negativo.",
-              pinyin: "shī wàng",
-              frequency: "alta",
-              simplified: "失望",
-              traditional: "失望",
-            },
-          ],
-          examples: [
-            {
-              pinyin: "wǒ xī wàng míng tiān tiān qì hǎo.",
-              simplified: "我 希望 明天 天气 好。",
-              traditional: "我 希望 明天 天氣 好。",
-              translation: "Espero que amanhã faça bom tempo.",
-            },
-            {
-              pinyin: "tā xī wàng néng zhǎo dào yī gè hǎo gōng zuò.",
-              simplified: "他 希望 能 找到 一个 好 工作。",
-              traditional: "他 希望 能 找到 一個 好 工作。",
-              translation: "Ele espera poder encontrar um bom trabalho.",
-            },
-          ],
-          synonyms: [
-            {
-              usage:
-                "Significa 'ansiar por', 'aguardar com expectativa'. Implica uma espera mais longa e um desejo mais forte e emocional do que '希望'.",
-              pinyin: "pàn wàng",
-              frequency: "média",
-              simplified: "盼望",
-              traditional: "盼望",
-            },
-            {
-              usage:
-                "Refere-se a 'ter uma expectativa sobre alguém ou algo', muitas vezes implicando que essa expectativa é razoável ou que há uma base para ela. É mais formal e menos emocional que '希望'.",
-              pinyin: "qī wàng",
-              frequency: "média",
-              simplified: "期望",
-              traditional: "期望",
-            },
-          ],
-          frequency: "alta",
-          definition: "esperar; desejar",
-          pronunciation: "xī wàng",
+      token = tokenResponse.token;
+    }
+
+    // Use Pinzi API
+    const API_ENDPOINT = "https://api.pinzi.org/ai/meaning";
+    console.log(`[Pinzi] Calling API: ${API_ENDPOINT}?word=${word}`);
+
+    const response = await fetch(
+      `${API_ENDPOINT}?word=${encodeURIComponent(word)}&language=pt`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        {
-          class: "substantivo",
-          notes:
-            "A palavra '希望' é fundamental tanto na fala cotidiana quanto na escrita formal. O caractere '希' (xī) por si só significa 'esperar' ou 'raro', enquanto '望' (wàng) significa 'olhar para longe' ou 'esperar'. Juntos, eles criam a imagem de 'olhar para longe com expectativa', que encapsula perfeitamente o conceito de esperança.",
-          usage:
-            "Refere-se ao conceito ou sentimento de esperança. Pode ser o sujeito ou o objeto de uma frase.",
-          antonyms: [
-            {
-              usage:
-                "Significa 'desespero', 'desesperança'. É um estado de completa ausência de esperança, muito mais forte que '失望' (desapontamento).",
-              pinyin: "jué wàng",
-              frequency: "média",
-              simplified: "绝望",
-              traditional: "絕望",
-            },
-          ],
-          examples: [
-            {
-              pinyin: "bù yào fàng qì xī wàng.",
-              simplified: "不要 放弃 希望。",
-              traditional: "不要 放棄 希望。",
-              translation: "Não perca a esperança.",
-            },
-            {
-              pinyin: "tā zuì dà de xī wàng jiù shì jiā rén jiàn kāng.",
-              simplified: "他 最大 的 希望 就是 家人 健康。",
-              traditional: "他 最大 的 希望 就是 家人 健康。",
-              translation:
-                "A maior esperança dele é que sua família seja saudável.",
-            },
-          ],
-          frequency: "alta",
-          definition: "esperança; desejo",
-          classifiers: [
-            {
-              usage:
-                "Classificador geral, usado para um desejo ou esperança específica e contável. Ex: 一个希望 (yī gè xī wàng) - uma esperança.",
-              pinyin: "gè",
-              frequency: "alta",
-              simplified: "个",
-              traditional: "個",
-            },
-            {
-              usage:
-                "Literalmente 'um fio de', usado para descrever uma pequena quantidade ou um vislumbre de esperança. Ex: 一丝希望 (yī sī xī wàng) - um pingo de esperança.",
-              pinyin: "sī",
-              frequency: "média",
-              simplified: "丝",
-              traditional: "絲",
-            },
-          ],
-          pronunciation: "xī wàng",
-          common_expressions: [
-            {
-              pinyin: "yī xiàn xī wàng",
-              simplified: "一线希望",
-              traditional: "一線希望",
-              translation:
-                "Um raio de esperança (lit. 'uma linha de esperança').",
-            },
-            {
-              pinyin: "bào zhe xī wàng",
-              simplified: "抱着希望",
-              traditional: "抱著希望",
-              translation:
-                "Agarrar-se à esperança (lit. 'abraçar a esperança').",
-            },
-          ],
-        },
-      ],
-      simplified: "希望",
-      traditional: "希望",
-      executionTime: 8.108466029167175,
-    };
+      }
+    );
 
-    console.log("[Pinzi] Returning mock data:", mockData);
-    return mockData;
+    console.log(`[Pinzi] API response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Pinzi] API error response:`, errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: DictionaryData = await response.json();
+    console.log("[Pinzi] API data received:", data);
+    return data;
   } catch (error) {
     console.error("[Pinzi] Error fetching dictionary data:", error);
     return null;
   }
 }
 
+// Global reference to the dialog container and root
+let dialogContainer: HTMLDivElement | null = null;
+let dialogRoot: ReturnType<typeof createRoot> | null = null;
+
 /**
- * Create and show dictionary popup
+ * Create and show dictionary popup using React
  */
-function createDictionaryPopup(data: DictionaryData, clickEvent: MouseEvent) {
-  console.log("[Pinzi] createDictionaryPopup called with data:", data);
-
-  // Remove existing popup if any
-  const existingDialog = document.getElementById(
-    "pinzi-dictionary-dialog"
-  ) as HTMLDialogElement;
-  if (existingDialog) {
-    console.log("[Pinzi] Removing existing dialog");
-    existingDialog.close();
-    existingDialog.remove();
-  }
-
-  // Create dialog element
-  console.log("[Pinzi] Creating dialog element");
-  const dialog = document.createElement("dialog");
-  dialog.id = "pinzi-dictionary-dialog";
-  dialog.className = "pinzi-dialog";
-
-  // Create dialog content
-  const content = `
-    <div class="pinzi-dialog-content">
-      <div class="pinzi-popup-header">
-        <div class="pinzi-popup-title">
-          <span class="pinzi-word-simplified">${data.simplified}</span>
-          ${
-            data.traditional !== data.simplified
-              ? `<span class="pinzi-word-traditional">${data.traditional}</span>`
-              : ""
-          }
-        </div>
-        <button class="pinzi-popup-close" id="pinzi-popup-close">&times;</button>
-      </div>
-      <div class="pinzi-popup-body">
-        ${data.meanings
-          .map(
-            (meaning, idx) => `
-          <div class="pinzi-meaning" key="${idx}">
-            <div class="pinzi-meaning-header">
-              <span class="pinzi-word-class">${meaning.class}</span>
-              <span class="pinzi-pronunciation">${meaning.pronunciation}</span>
-              <span class="pinzi-frequency pinzi-freq-${meaning.frequency}">${
-              meaning.frequency
-            }</span>
-            </div>
-            <div class="pinzi-definition">${meaning.definition}</div>
-            
-            ${
-              meaning.usage
-                ? `<div class="pinzi-usage"><strong>Uso:</strong> ${meaning.usage}</div>`
-                : ""
-            }
-            
-            ${
-              meaning.examples && meaning.examples.length > 0
-                ? `
-              <div class="pinzi-section">
-                <div class="pinzi-section-title">Exemplos:</div>
-                ${meaning.examples
-                  .map(
-                    (ex) => `
-                  <div class="pinzi-example">
-                    <div class="pinzi-example-chinese">
-                      ${ex.simplified}
-                      ${
-                        ex.traditional !== ex.simplified
-                          ? `<span class="pinzi-traditional">(${ex.traditional})</span>`
-                          : ""
-                      }
-                    </div>
-                    <div class="pinzi-example-pinyin">${ex.pinyin}</div>
-                    <div class="pinzi-example-translation">${
-                      ex.translation
-                    }</div>
-                  </div>
-                `
-                  )
-                  .join("")}
-              </div>
-            `
-                : ""
-            }
-            
-            ${
-              meaning.synonyms && meaning.synonyms.length > 0
-                ? `
-              <div class="pinzi-section">
-                <div class="pinzi-section-title">Sinônimos:</div>
-                <div class="pinzi-related-words">
-                  ${meaning.synonyms
-                    .map(
-                      (syn) => `
-                    <div class="pinzi-related-word">
-                      <span class="pinzi-related-hanzi">${syn.simplified}</span>
-                      <span class="pinzi-related-pinyin">${syn.pinyin}</span>
-                      ${
-                        syn.usage
-                          ? `<div class="pinzi-related-usage">${syn.usage}</div>`
-                          : ""
-                      }
-                    </div>
-                  `
-                    )
-                    .join("")}
-                </div>
-              </div>
-            `
-                : ""
-            }
-            
-            ${
-              meaning.antonyms && meaning.antonyms.length > 0
-                ? `
-              <div class="pinzi-section">
-                <div class="pinzi-section-title">Antônimos:</div>
-                <div class="pinzi-related-words">
-                  ${meaning.antonyms
-                    .map(
-                      (ant) => `
-                    <div class="pinzi-related-word">
-                      <span class="pinzi-related-hanzi">${ant.simplified}</span>
-                      <span class="pinzi-related-pinyin">${ant.pinyin}</span>
-                      ${
-                        ant.usage
-                          ? `<div class="pinzi-related-usage">${ant.usage}</div>`
-                          : ""
-                      }
-                    </div>
-                  `
-                    )
-                    .join("")}
-                </div>
-              </div>
-            `
-                : ""
-            }
-            
-            ${
-              meaning.classifiers && meaning.classifiers.length > 0
-                ? `
-              <div class="pinzi-section">
-                <div class="pinzi-section-title">Classificadores:</div>
-                <div class="pinzi-related-words">
-                  ${meaning.classifiers
-                    .map(
-                      (cls) => `
-                    <div class="pinzi-related-word">
-                      <span class="pinzi-related-hanzi">${cls.simplified}</span>
-                      <span class="pinzi-related-pinyin">${cls.pinyin}</span>
-                      ${
-                        cls.usage
-                          ? `<div class="pinzi-related-usage">${cls.usage}</div>`
-                          : ""
-                      }
-                    </div>
-                  `
-                    )
-                    .join("")}
-                </div>
-              </div>
-            `
-                : ""
-            }
-            
-            ${
-              meaning.common_expressions &&
-              meaning.common_expressions.length > 0
-                ? `
-              <div class="pinzi-section">
-                <div class="pinzi-section-title">Expressões Comuns:</div>
-                ${meaning.common_expressions
-                  .map(
-                    (expr) => `
-                  <div class="pinzi-expression">
-                    <div class="pinzi-expression-chinese">${expr.simplified}</div>
-                    <div class="pinzi-expression-pinyin">${expr.pinyin}</div>
-                    <div class="pinzi-expression-translation">${expr.translation}</div>
-                  </div>
-                `
-                  )
-                  .join("")}
-              </div>
-            `
-                : ""
-            }
-            
-            ${
-              meaning.notes
-                ? `<div class="pinzi-notes"><strong>📝 Notas:</strong> ${meaning.notes}</div>`
-                : ""
-            }
-          </div>
-        `
-          )
-          .join('<div class="pinzi-meaning-divider"></div>')}
-      </div>
-    </div>
-  `;
-
-  dialog.innerHTML = content;
-  console.log("[Pinzi] Dialog HTML content set");
-
-  document.body.appendChild(dialog);
-  console.log("[Pinzi] Dialog added to document.body");
-
-  // Add event listeners for closing
-  const closeBtn = document.getElementById("pinzi-popup-close");
-
-  console.log("[Pinzi] Close button found:", !!closeBtn);
-
-  const closeDialog = () => {
-    console.log("[Pinzi] Closing dialog");
-    dialog.close();
-    setTimeout(() => dialog.remove(), 300);
-  };
-
-  closeBtn?.addEventListener("click", closeDialog);
-
-  // Close when clicking on backdrop
-  dialog.addEventListener("click", (e) => {
-    const dialogDimensions = dialog.getBoundingClientRect();
-    if (
-      e.clientX < dialogDimensions.left ||
-      e.clientX > dialogDimensions.right ||
-      e.clientY < dialogDimensions.top ||
-      e.clientY > dialogDimensions.bottom
-    ) {
-      closeDialog();
-    }
+function createDictionaryPopup(
+  data: DictionaryData | null,
+  isLoading: boolean,
+  error?: string
+) {
+  console.log("[Pinzi] createDictionaryPopup called", {
+    data,
+    isLoading,
+    error,
   });
 
-  // Show the dialog as modal
-  console.log("[Pinzi] Showing dialog as modal");
-  dialog.showModal();
-  console.log("[Pinzi] Dialog should now be visible");
+  // Create container if it doesn't exist
+  if (!dialogContainer) {
+    dialogContainer = document.createElement("div");
+    dialogContainer.id = "pinzi-dictionary-root";
+    document.body.appendChild(dialogContainer);
+    dialogRoot = createRoot(dialogContainer);
+  }
+
+  const handleClose = () => {
+    console.log("[Pinzi] Closing dialog");
+    if (dialogRoot && dialogContainer) {
+      dialogRoot.unmount();
+      dialogContainer.remove();
+      dialogContainer = null;
+      dialogRoot = null;
+    }
+  };
+
+  // Render the React component
+  dialogRoot?.render(
+    <DictionaryDialog
+      data={data}
+      isLoading={isLoading}
+      error={error}
+      onClose={handleClose}
+    />
+  );
 }
 
 /**
@@ -507,63 +220,24 @@ function addRbClickListeners(rootElement: Document | Element = document) {
       }
 
       // Show loading state
-      console.log("[Pinzi] Creating loading dialog...");
-      const loadingDialog = document.createElement("dialog");
-      loadingDialog.id = "pinzi-dictionary-dialog";
-      loadingDialog.className = "pinzi-dialog";
-      loadingDialog.innerHTML = `
-        <div class="pinzi-dialog-content">
-          <div class="pinzi-popup-loading">
-            <div class="pinzi-spinner"></div>
-            <div>Carregando dicionário...</div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(loadingDialog);
-      loadingDialog.showModal();
-      console.log("[Pinzi] Loading dialog shown");
+      console.log("[Pinzi] Showing loading dialog...");
+      createDictionaryPopup(null, true);
 
       // Fetch dictionary data
       console.log("[Pinzi] Fetching dictionary data...");
       const data = await fetchDictionaryData(word);
       console.log("[Pinzi] Dictionary data received:", data);
 
-      // Remove loading dialog
-      loadingDialog.close();
-      loadingDialog.remove();
-      console.log("[Pinzi] Loading dialog removed");
-
       if (data) {
         console.log("[Pinzi] Creating dictionary dialog with data");
-        createDictionaryPopup(data, event as MouseEvent);
+        createDictionaryPopup(data, false);
       } else {
         console.log("[Pinzi] No data received, showing error dialog");
-        // Show error message
-        const errorDialog = document.createElement("dialog");
-        errorDialog.id = "pinzi-dictionary-dialog";
-        errorDialog.className = "pinzi-dialog";
-        errorDialog.innerHTML = `
-          <div class="pinzi-dialog-content">
-            <div class="pinzi-popup-header">
-              <div class="pinzi-popup-title">Erro</div>
-              <button class="pinzi-popup-close" id="error-close-btn">&times;</button>
-            </div>
-            <div class="pinzi-popup-body">
-              <div class="pinzi-error">
-                Não foi possível carregar o dicionário para "${word}". 
-                Verifique se a API está configurada corretamente.
-              </div>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(errorDialog);
-        errorDialog.showModal();
-
-        const errorCloseBtn = document.getElementById("error-close-btn");
-        errorCloseBtn?.addEventListener("click", () => {
-          errorDialog.close();
-          errorDialog.remove();
-        });
+        createDictionaryPopup(
+          null,
+          false,
+          `Não foi possível carregar o dicionário para "${word}". Verifique se a API está configurada corretamente.`
+        );
       }
     });
   });

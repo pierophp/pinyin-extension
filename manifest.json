@@ -11,14 +11,17 @@
       "32": "icon-32.png"
     }
   },
-  "chrome_url_overrides": {
-    "newtab": "src/pages/newtab/index.html"
-  },
+  "chrome_url_overrides": {},
   "icons": {
     "128": "icon-128.png"
   },
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://editor.pinzi.org/*",
+    "https://api.pinzi.org/*"
   ],
   "content_scripts": [
     {
