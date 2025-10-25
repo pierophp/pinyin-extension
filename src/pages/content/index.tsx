@@ -3,9 +3,112 @@ import "./style.css";
 import { DictionaryDialog } from "./DictionaryDialog";
 import { getToken } from "./helpers/getToken";
 import styleText from "./style.css?inline";
+import separatePinyinInSyllables from "./helpers/separate-pinyin-in-syllables";
 
 // List of Chinese words that should have their pinyin (ruby text) removed
 let WORDS_TO_HIDE_PINYIN: string[] = [];
+
+/**
+ * Get tone number from a pinyin syllable
+ * Returns 1-4 for tones, 0 for neutral/no tone mark
+ */
+function getToneFromPinyin(pinyin: string): number {
+  if (!pinyin) return 0;
+
+  const tone1 = /[āēīōūǖ]/;
+  const tone2 = /[áéíóúǘ]/;
+  const tone3 = /[ǎěǐǒǔǚ]/;
+  const tone4 = /[àèìòùǜ]/;
+
+  if (tone1.test(pinyin)) return 1;
+  if (tone2.test(pinyin)) return 2;
+  if (tone3.test(pinyin)) return 3;
+  if (tone4.test(pinyin)) return 4;
+  return 0; // Neutral tone
+}
+
+/**
+ * Get color for a tone
+ * 1st tone: blue, 2nd tone: purple, 3rd tone: green, 4th tone: red, neutral: original
+ */
+function getColorForTone(tone: number): string {
+  switch (tone) {
+    case 1:
+      return "#3b82f6"; // blue
+    case 2:
+      return "#a855f7"; // purple
+    case 3:
+      return "#10b981"; // green
+    case 4:
+      return "#ef4444"; // red
+    default:
+      return ""; // neutral - original color
+  }
+}
+
+/**
+ * Apply color spans to rbElement characters based on pinyin tones
+ */
+function applyToneColorsToRb(
+  rbElement: HTMLElement,
+  separatedPinyin: string[]
+) {
+  const text = rbElement.textContent || "";
+  const characters = Array.from(text);
+
+  // If no pinyin or mismatch, do nothing
+  if (separatedPinyin.length === 0 || characters.length === 0) return;
+
+  // Create an array of tones for each character
+  const tones: number[] = [];
+  let pinyinIndex = 0;
+
+  for (let i = 0; i < characters.length; i++) {
+    if (pinyinIndex < separatedPinyin.length) {
+      tones.push(getToneFromPinyin(separatedPinyin[pinyinIndex]));
+      pinyinIndex++;
+    } else {
+      tones.push(0); // No pinyin for this character
+    }
+  }
+
+  // Group consecutive characters with the same color
+  const groups: { chars: string[]; tone: number }[] = [];
+  let currentGroup: { chars: string[]; tone: number } | null = null;
+
+  for (let i = 0; i < characters.length; i++) {
+    const tone = tones[i];
+    const char = characters[i];
+
+    if (!currentGroup || currentGroup.tone !== tone) {
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+      currentGroup = { chars: [char], tone };
+    } else {
+      currentGroup.chars.push(char);
+    }
+  }
+
+  if (currentGroup) {
+    groups.push(currentGroup);
+  }
+
+  // Build the HTML with spans
+  const html = groups
+    .map(({ chars, tone }) => {
+      const text = chars.join("");
+      const color = getColorForTone(tone);
+
+      if (color) {
+        return `<span style="color: ${color}">${text}</span>`;
+      }
+      return text;
+    })
+    .join("");
+
+  rbElement.innerHTML = html;
+}
 
 /**
  * Remove pinyin (rt element) from ruby elements where rb matches the word list
@@ -23,13 +126,24 @@ function removePinyinForSpecificWords(
 
     // Check if the text content matches any word in our list
     const rbText = rbElement.textContent?.trim() || "";
-    if (WORDS_TO_HIDE_PINYIN.includes(rbText)) {
-      // Find all rt (ruby text) elements and hide them with Tailwind CSS
-      const rtElements = ruby.querySelectorAll("rt");
-      rtElements.forEach((rt) => {
+
+    // Find all rt (ruby text) elements and hide them with Tailwind CSS
+    const rtElements = ruby.querySelectorAll("rt");
+
+    rtElements.forEach((rt) => {
+      const separatedPinyin = separatePinyinInSyllables(rt.textContent);
+      console.log(
+        `[Pinzi] Hiding rt element: "${rbText}" -> "${separatePinyinInSyllables(
+          rt.textContent
+        ).join(" ")}"`
+      );
+
+      // Apply tone colors to rbElement
+      applyToneColorsToRb(rbElement as HTMLElement, separatedPinyin);
+      if (WORDS_TO_HIDE_PINYIN.includes(rbText)) {
         rt.classList.add("!hidden");
-      });
-    }
+      }
+    });
   });
 }
 
