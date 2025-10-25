@@ -4,47 +4,11 @@ import { DictionaryDialog } from "./DictionaryDialog";
 import { getToken } from "./helpers/getToken";
 import styleText from "./style.css?inline";
 import separatePinyinInSyllables from "./helpers/separate-pinyin-in-syllables";
+import getToneFromPinyin from "./helpers/getToneFromPinyin";
+import getColorForTone from "./helpers/getColorForTone";
 
 // List of Chinese words that should have their pinyin (ruby text) removed
 let WORDS_TO_HIDE_PINYIN: string[] = [];
-
-/**
- * Get tone number from a pinyin syllable
- * Returns 1-4 for tones, 0 for neutral/no tone mark
- */
-function getToneFromPinyin(pinyin: string): number {
-  if (!pinyin) return 0;
-
-  const tone1 = /[āēīōūǖ]/;
-  const tone2 = /[áéíóúǘ]/;
-  const tone3 = /[ǎěǐǒǔǚ]/;
-  const tone4 = /[àèìòùǜ]/;
-
-  if (tone1.test(pinyin)) return 1;
-  if (tone2.test(pinyin)) return 2;
-  if (tone3.test(pinyin)) return 3;
-  if (tone4.test(pinyin)) return 4;
-  return 0; // Neutral tone
-}
-
-/**
- * Get color for a tone
- * 1st tone: blue, 2nd tone: purple, 3rd tone: green, 4th tone: red, neutral: original
- */
-function getColorForTone(tone: number): string {
-  switch (tone) {
-    case 1:
-      return "#3b82f6"; // blue
-    case 2:
-      return "#a855f7"; // purple
-    case 3:
-      return "#10b981"; // green
-    case 4:
-      return "#ef4444"; // red
-    default:
-      return ""; // neutral - original color
-  }
-}
 
 /**
  * Apply color spans to rbElement characters based on pinyin tones

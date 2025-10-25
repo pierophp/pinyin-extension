@@ -1,4 +1,77 @@
 import React, { useEffect, useRef, useState } from "react";
+import separatePinyinInSyllables from "./helpers/separate-pinyin-in-syllables";
+import getToneFromPinyin from "./helpers/getToneFromPinyin";
+import getColorForTone from "./helpers/getColorForTone";
+
+/**
+ * Component to render Chinese characters with tone-based colors
+ */
+const ColoredIdeogram: React.FC<{
+  text: string;
+  pinyin: string;
+}> = ({ text, pinyin }) => {
+  const separatedPinyin = separatePinyinInSyllables(pinyin);
+  const characters = Array.from(text);
+
+  // If no pinyin or mismatch, return plain text
+  if (separatedPinyin.length === 0 || characters.length === 0) {
+    return <span>{text}</span>;
+  }
+
+  // Create an array of tones for each character
+  const tones: number[] = [];
+  let pinyinIndex = 0;
+
+  for (let i = 0; i < characters.length; i++) {
+    if (pinyinIndex < separatedPinyin.length) {
+      tones.push(getToneFromPinyin(separatedPinyin[pinyinIndex]));
+      pinyinIndex++;
+    } else {
+      tones.push(0); // No pinyin for this character
+    }
+  }
+
+  // Group consecutive characters with the same color
+  const groups: { chars: string[]; tone: number }[] = [];
+  let currentGroup: { chars: string[]; tone: number } | null = null;
+
+  for (let i = 0; i < characters.length; i++) {
+    const tone = tones[i];
+    const char = characters[i];
+
+    if (!currentGroup || currentGroup.tone !== tone) {
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+      currentGroup = { chars: [char], tone };
+    } else {
+      currentGroup.chars.push(char);
+    }
+  }
+
+  if (currentGroup) {
+    groups.push(currentGroup);
+  }
+
+  // Render spans with colors
+  return (
+    <>
+      {groups.map((group, index) => {
+        const text = group.chars.join("");
+        const color = getColorForTone(group.tone);
+
+        if (color) {
+          return (
+            <span key={index} style={{ color }}>
+              {text}
+            </span>
+          );
+        }
+        return <span key={index}>{text}</span>;
+      })}
+    </>
+  );
+};
 
 // Type definitions for dictionary data
 interface DictionaryWord {
@@ -363,11 +436,17 @@ export const DictionaryDialog: React.FC<DictionaryDialogProps> = ({
             <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200 bg-white">
               <div className="flex items-center gap-3">
                 <span className="text-emerald-600 text-2xl font-semibold">
-                  {data.simplified}
+                  <ColoredIdeogram
+                    text={data.simplified}
+                    pinyin={data.meanings[0]?.pronunciation || ""}
+                  />
                 </span>
                 {data.traditional !== data.simplified && (
                   <span className="text-gray-400 text-xl">
-                    {data.traditional}
+                    <ColoredIdeogram
+                      text={data.traditional}
+                      pinyin={data.meanings[0]?.pronunciation || ""}
+                    />
                   </span>
                 )}
                 <span className="text-gray-600 text-lg">
