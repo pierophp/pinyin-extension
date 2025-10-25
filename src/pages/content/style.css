@@ -3,14 +3,10 @@
 /* Make rb elements clickable */
 .pinzi-clickable {
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: rgba(59, 130, 246, 0.4);
-  transition: all 0.2s ease;
+  margin-right: 5px;
 }
 
 .pinzi-clickable:hover {
-  text-decoration-color: rgba(59, 130, 246, 0.8);
   color: rgb(37, 99, 235);
 }
 

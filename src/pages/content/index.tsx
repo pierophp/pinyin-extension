@@ -42,19 +42,22 @@ async function fetchDictionaryData(
   console.log(`[Pinzi] fetchDictionaryData called for word: "${word}"`);
   try {
     // Use Pinzi API
-    const API_ENDPOINT = "https://api.pinzi.org/ai/meaning";
-    console.log(`[Pinzi] Calling API: ${API_ENDPOINT}?word=${word}`);
+    // const API_ENDPOINT = `https://api.pinzi.org/ai/meaning?word=${encodeURIComponent(
+    //   word
+    // )}&language=pt`;
 
-    const response = await fetch(
-      `${API_ENDPOINT}?word=${encodeURIComponent(word)}&language=pt`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await getToken()}`,
-        },
-      }
-    );
+    const API_ENDPOINT = `https://public-files.pinzi.org/dictionary/pt/${encodeURIComponent(
+      word
+    )}.json`;
+    // console.log(`[Pinzi] Calling API: ${API_ENDPOINT}`);
+
+    const response = await fetch(API_ENDPOINT, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        // Authorization: `Bearer ${await getToken()}`,
+      },
+    });
 
     console.log(`[Pinzi] API response status: ${response.status}`);
 

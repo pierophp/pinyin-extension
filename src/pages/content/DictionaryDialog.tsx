@@ -179,11 +179,11 @@ const MeaningSection: React.FC<{ meaning: Meaning; index: number }> = ({
                       {example.simplified.split("").map((char, i) => {
                         // Color matching characters from the example
                         const colors = [
-                          "text-emerald-600",
-                          "text-red-600",
                           "text-blue-600",
                           "text-purple-600",
-                          "text-orange-600",
+                          "text-emerald-600",
+                          "text-red-600",
+                          "",
                         ];
                         return (
                           <span key={i} className={colors[i % colors.length]}>
